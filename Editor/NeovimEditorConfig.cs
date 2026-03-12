@@ -9,9 +9,48 @@ using Newtonsoft.Json;
 namespace Neovim.Editor
 {
   [Serializable]
+  public class ModifierBinding
+  {
+    /// <summary>
+    /// EventModifiers cast to int (0 = no modifier = default).
+    /// </summary>
+    public int Modifiers;
+
+
+    /// <summary>
+    /// String representation of this binding (e.g., "SHIFT+CTRL"). This is mainly used so that it is easier to read
+    /// this from a raw JSON file.
+    /// </summary>
+    public string Representation;
+
+
+    /// <summary>
+    /// Arguments associated with this binding that will be supplied to nvim remote command.
+    /// </summary>
+    public string Args;
+  }
+
+  [Serializable]
   public class NeovimEditorConfig
   {
     private bool m_Dirty = false;
+
+    private string m_NvimExecutablePath;
+
+    /// <summary>
+    /// Absolute path to the Neovim executable currently in use.
+    /// </summary>
+    public string NvimExecutablePath
+    {
+      get => m_NvimExecutablePath;
+      set
+      {
+        if (value == m_NvimExecutablePath)
+          return;
+        m_NvimExecutablePath = value;
+        m_Dirty = true;
+      }
+    }
 
     private int m_ProcessTimeout = 150;
     public int ProcessTimeout
@@ -66,6 +105,9 @@ namespace Neovim.Editor
     }
 
     private string m_OpenFileArgs;
+    /// <summary>
+    /// Current open-file arguments that will be supplied to nvim remote cmd upon opening a file from Unity.
+    /// </summary>
     public string OpenFileArgs
     {
       get => m_OpenFileArgs;
@@ -74,6 +116,17 @@ namespace Neovim.Editor
         if (value == m_OpenFileArgs)
           return;
         m_OpenFileArgs = value;
+        m_Dirty = true;
+      }
+    }
+
+    private List<ModifierBinding> m_ModifierBindings = new();
+    public List<ModifierBinding> ModifierBindings
+    {
+      get => m_ModifierBindings;
+      set
+      {
+        m_ModifierBindings = value;
         m_Dirty = true;
       }
     }
