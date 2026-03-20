@@ -1,4 +1,4 @@
-#pragma warning disable IDE0130
+#pragma warning disable IDE0130, IDE0090, IDE0063
 using System;
 using System.IO;
 using System.Net;
@@ -8,12 +8,14 @@ namespace Neovim.Editor
 {
   public static class NetUtils
   {
-    private static readonly IPEndPoint DefaultLoopbackEp = new(IPAddress.Loopback, port: 0);
+    private static readonly IPEndPoint DefaultLoopbackEp = new IPEndPoint(IPAddress.Loopback, port: 0);
     public static int GetRandomAvailablePort()
     {
-      using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-      socket.Bind(DefaultLoopbackEp);
-      return ((IPEndPoint)socket.LocalEndPoint).Port;
+      using (var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+      {
+        socket.Bind(DefaultLoopbackEp);
+        return ((IPEndPoint)socket.LocalEndPoint).Port;
+      }
     }
 
 #if UNITY_EDITOR_LINUX || UNITY_EDITOR_OSX
@@ -40,7 +42,7 @@ namespace Neovim.Editor
       IPAddress _ip = IPAddress.Parse(ip);
       try
       {
-        TcpListener list = new(_ip, port);
+        TcpListener list = new TcpListener(_ip, port);
         list.Start();
         list.Stop();
       }

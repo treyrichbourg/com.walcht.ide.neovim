@@ -1,7 +1,8 @@
-#pragma warning disable IDE0130, IDE0031
+#pragma warning disable IDE0130, IDE0031, IDE0090
 using UnityEngine;
 using UnityEditor;
 using UnityEngine.UIElements;
+using UnityEditor.UIElements;  // for EnumField in older Unity versions (e.g., Unity 2020.3)
 using Unity.CodeEditor;
 using System.Linq;
 using System.Collections.Generic;
@@ -28,10 +29,10 @@ namespace Neovim.Editor
     private Label m_InfoDesc;
 
     // visual tree (i.e., uxml) assets
-    private static readonly VisualTreeAsset s_MainWindowVT;
-    private static readonly VisualTreeAsset s_DefaultModifierBindingVT;
-    private static readonly VisualTreeAsset s_ModifierBindingVT;
-    private static readonly VisualTreeAsset s_AnalyzerEntryVT;
+    private static VisualTreeAsset s_MainWindowVT;
+    private static VisualTreeAsset s_DefaultModifierBindingVT;
+    private static VisualTreeAsset s_ModifierBindingVT;
+    private static VisualTreeAsset s_AnalyzerEntryVT;
 
     private static float s_X = Mathf.FloorToInt(Screen.width * 0.5f - Screen.width * 0.25f);
     private static float s_Y = Mathf.FloorToInt(Screen.height * 0.5f - Screen.height * 0.25f);
@@ -64,7 +65,7 @@ namespace Neovim.Editor
     ////////////////////////////////////////////////////////////////////////////
     // Open-file-request args
     ////////////////////////////////////////////////////////////////////////////
-    private static readonly Dictionary<string, int> s_OpenFileModifiers = new()
+    private static readonly Dictionary<string, int> s_OpenFileModifiers = new Dictionary<string, int>()
     {
       ["SHIFT"] = (int)EventModifiers.Shift,
       ["CTRL"] = (int)EventModifiers.Control,
@@ -98,18 +99,14 @@ namespace Neovim.Editor
     private VisualElement m_AnalyzerRowsParent;
 
 
-    // TODO: persistent window position
-    static NeovimSettingsWindow()
-    {
-      s_MainWindowVT = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Packages/com.walcht.ide.neovim/Editor/settings_window.uxml");
-      s_DefaultModifierBindingVT = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Packages/com.walcht.ide.neovim/Editor/default_modifier_binding.uxml");
-      s_ModifierBindingVT = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Packages/com.walcht.ide.neovim/Editor/modifier_binding.uxml");
-      s_AnalyzerEntryVT = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Packages/com.walcht.ide.neovim/Editor/analyzer_entry.uxml");
-    }
+    ////////////////////////////////////////////////////////////////////////////
+    // Roslyn LS Settings
+    ////////////////////////////////////////////////////////////////////////////
+    private EnumField m_AnalyzerDiagnosticScopeEf;
+    private EnumField m_CompilerDiagnosticScopeEf;
 
 
     // MenuItem Creates a menu item and invokes the static function that follows it when the menu item is selected.
-    // TODO: don't show if Neovim is not chosen in External Editor Tools
     [MenuItem("Neovim/Settings")]
     public static void ShowWindow()
     {
@@ -117,7 +114,10 @@ namespace Neovim.Editor
       // keep this shit in this order - if you set position THEN minSize, position will be reset ...
       window.minSize = new Vector2(650, 300);
       window.position = new Rect(s_X, s_Y, s_Width, s_Height);
+
+#if UNITY_2020_2_OR_NEWER
       window.saveChangesMessage = "This window has unsaved changes. Would you like to save?";
+#endif
       window.ShowModalUtility();
 
       // save window position so that you do not have to resize it each time
@@ -128,22 +128,27 @@ namespace Neovim.Editor
     }
 
 
+#if UNITY_2020_2_OR_NEWER
     public override void SaveChanges()
     {
       Save();
       base.SaveChanges();
     }
+#endif
 
-
+#if UNITY_2022_2_OR_NEWER
     public override void DiscardChanges()
     {
       base.DiscardChanges();
     }
+#endif
 
 
     private void SetDirty(bool val)
     {
+#if UNITY_2020_2_OR_NEWER
       hasUnsavedChanges = val;
+#endif
       if (m_ApplyBtn != null)
         m_ApplyBtn.SetEnabled(val);
     }
@@ -152,6 +157,11 @@ namespace Neovim.Editor
     // CreateGUI is called when the EditorWindow's rootVisualElement is ready to be populated.
     private void CreateGUI()
     {
+      s_MainWindowVT = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Packages/com.walcht.ide.neovim/Editor/settings_window.uxml");
+      s_DefaultModifierBindingVT = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Packages/com.walcht.ide.neovim/Editor/default_modifier_binding.uxml");
+      s_ModifierBindingVT = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Packages/com.walcht.ide.neovim/Editor/modifier_binding.uxml");
+      s_AnalyzerEntryVT = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Packages/com.walcht.ide.neovim/Editor/analyzer_entry.uxml");
+
       s_OpenFileTemplateNames = NeovimCodeEditor.s_OpenFileArgsTemplates
         .Select(t => t.Name)
         .Append(k_CustomLabel)
@@ -169,7 +179,7 @@ namespace Neovim.Editor
 
       var root = rootVisualElement;
 
-      VisualElement mainPanel = s_MainWindowVT.Instantiate();
+      VisualElement mainPanel = s_MainWindowVT.CloneTree();
       mainPanel.style.flexGrow = 1;  // keep this because Unity UIToolkit still sucks...
 
       // toolbar buttons
@@ -228,16 +238,18 @@ namespace Neovim.Editor
 
       // terminal launch cmd args
       {
-        var termLaunchDf = mainPanel.Q<DropdownField>("terminal-launch-templates-dd");
+        var termLaunchContainer = mainPanel.Q<VisualElement>("terminal-launch-cmd-args");
+        var termLaunchDf = new PopupField<string>("template:", s_TermLaunchCmdTemplateNames, 0);
+        termLaunchContainer.Add(termLaunchDf);
+
         m_TermLaunchCmdTf = mainPanel.Q<TextField>("terminal-launch-cmd-tf");
         m_TermLaunchArgsTf = mainPanel.Q<TextField>("terminal-launch-args-tf");
         m_TermLaunchEnvTf = mainPanel.Q<TextField>("terminal-launch-env-tf");
-        termLaunchDf.choices = s_TermLaunchCmdTemplateNames;
-        termLaunchDf.SetValueWithoutNotify("select template");
         m_TermLaunchCmdTf.SetValueWithoutNotify(NeovimCodeEditor.s_Config.TermLaunchCmd);
         m_TermLaunchArgsTf.SetValueWithoutNotify(NeovimCodeEditor.s_Config.TermLaunchArgs);
         m_TermLaunchEnvTf.SetValueWithoutNotify(NeovimCodeEditor.s_Config.TermLaunchEnv);
 
+        termLaunchDf.PlaceBehind(m_TermLaunchCmdTf);
         termLaunchDf.RegisterValueChangedCallback(e =>
         {
           if (e.newValue == k_CustomLabel)
@@ -283,10 +295,14 @@ namespace Neovim.Editor
       {
         string currArgs = NeovimCodeEditor.s_Config.JumpToCursorPositionArgs;
         string currentTemplateName = GetJumpToCursorPosTemplateName(currArgs);
-        var templatesDd = mainPanel.Q<DropdownField>("jump-to-cursor-pos-templates");
-        templatesDd.choices = s_JumpToCursorPosTemplateNames;
+
+        var container = mainPanel.Q<VisualElement>("jump-to-cursor-pos-args");
+        var templatesDd = new PopupField<string>("template:", s_JumpToCursorPosTemplateNames, 0);
         templatesDd.SetValueWithoutNotify(currentTemplateName);
+        container.Add(templatesDd);
+
         m_JumpToCursorPosArgsTf = mainPanel.Q<TextField>("jump-to-cursor-pos-args-tf");
+        templatesDd.PlaceBehind(m_JumpToCursorPosArgsTf);
         m_JumpToCursorPosArgsTf.SetValueWithoutNotify(currArgs);
 
         m_JumpToCursorPosArgsTf.RegisterValueChangedCallback(e =>
@@ -379,6 +395,28 @@ namespace Neovim.Editor
         RebuildAnalyzerRows();
       }
 
+      // Roslyn LS settings
+      {
+        m_AnalyzerDiagnosticScopeEf = mainPanel.Q<EnumField>("analyzer-diagnostic-scope-ef");
+        m_CompilerDiagnosticScopeEf = mainPanel.Q<EnumField>("compiler-diagnostic-scope-ef");
+        m_AnalyzerDiagnosticScopeEf.Init(NeovimCodeEditor.s_Config.AnalyzerDiagnosticScope);
+        m_CompilerDiagnosticScopeEf.Init(NeovimCodeEditor.s_Config.CompilerDiagnosticScope);
+
+        m_AnalyzerDiagnosticScopeEf.RegisterValueChangedCallback(e =>
+        {
+          if ((RoslynDiagnosticScope)e.newValue == NeovimCodeEditor.s_Config.AnalyzerDiagnosticScope)
+            return;
+          SetDirty(true);
+        });
+
+        m_CompilerDiagnosticScopeEf.RegisterValueChangedCallback(e =>
+        {
+          if ((RoslynDiagnosticScope)e.newValue == NeovimCodeEditor.s_Config.CompilerDiagnosticScope)
+            return;
+          SetDirty(true);
+        });
+      }
+
       // info panel (right panel)
       {
         m_InfoName = mainPanel.Q<Label>("curr-template-name");
@@ -388,13 +426,15 @@ namespace Neovim.Editor
         m_InstanceIdTf = mainPanel.Q<TextField>("instanceid-placeholder-tf");
 #if UNITY_EDITOR_WIN
         m_ProcessPIDPlaceholderTf = mainPanel.Q<TextField>("processpid-placeholder-tf");
-        m_ProcessPIDPlaceholderTf.SetValueWithoutNotify(NeovimCodeEditor.s_GetProcessPPIDPath);
+        m_ProcessPIDPlaceholderTf.SetValueWithoutNotify(NeovimCodeEditor.GetProcessWindowHandlePath);
 #else
         mainPanel.Q<VisualElement>("processpid-placeholder").RemoveFromHierarchy();
 #endif
         m_AppPlaceholderTf.SetValueWithoutNotify(NeovimCodeEditor.s_Config.NvimExecutablePath);
         m_ServerSocketTf.SetValueWithoutNotify(NeovimCodeEditor.ServerSocket);
         m_InstanceIdTf.SetValueWithoutNotify(NeovimCodeEditor.s_InstanceId);
+        mainPanel.Q<TextField>("project-root-dir-placeholder-tf").SetValueWithoutNotify(
+            FileUtility.NormalizeWindowsToUnix(Directory.GetParent(Application.dataPath).ToString()));
       }
 
       root.Add(mainPanel);
@@ -436,6 +476,11 @@ namespace Neovim.Editor
       // update process timeout
       m_ProcessTimeoutIf.SetValueWithoutNotify(NeovimCodeEditor.s_Config.ProcessTimeout = m_ProcessTimeoutIf.value);
 
+      // Roslyn LS settings
+      m_AnalyzerDiagnosticScopeEf.SetValueWithoutNotify(NeovimCodeEditor.SetAnalyzerDiagnosticScope((RoslynDiagnosticScope)m_AnalyzerDiagnosticScopeEf.value));
+      m_CompilerDiagnosticScopeEf.SetValueWithoutNotify(NeovimCodeEditor.SetCompilerDiagnosticScope((RoslynDiagnosticScope)m_CompilerDiagnosticScopeEf.value));
+      NeovimCodeEditor.RestartRoslynLS();
+
       // serialize the config shit
       NeovimCodeEditor.s_Config.Save();
 
@@ -450,7 +495,7 @@ namespace Neovim.Editor
     }
 
 
-    private void OnProjectRegenerationClick() => CodeEditor.Editor.CurrentCodeEditor.SyncAll();
+    private void OnProjectRegenerationClick() => NeovimCodeEditor.Sync();
 
 
     private void OnProjectGenerationFlag(ChangeEvent<bool> _) => SetDirty(true);
@@ -522,7 +567,7 @@ namespace Neovim.Editor
       for (int i = NeovimCodeEditor.s_Config.Analyzers.Count - 1; i >= 0; --i)
       {
         int j = i;
-        VisualElement row = s_AnalyzerEntryVT.Instantiate();
+        VisualElement row = s_AnalyzerEntryVT.CloneTree();
         var analyzerNameLabel = row.Q<Label>("analyzer-name");
         var analyzerPathLabel = row.Q<Label>("analyzer-path");
         var deleteBtn = row.Q<Button>("delete-btn");
@@ -553,18 +598,30 @@ namespace Neovim.Editor
 
         if (isDefault)
         {
-          row = s_DefaultModifierBindingVT.Instantiate();
+          row = s_DefaultModifierBindingVT.CloneTree();
         }
         else
         {
-          row = s_ModifierBindingVT.Instantiate();
+          row = s_ModifierBindingVT.CloneTree();
 
-          var modifierDd = row.Q<DropdownField>("modifiers-dd");
           var deleteBtn = row.Q<Button>("delete-btn");
 
           var _modifiers = s_OpenFileModifiers.Keys.ToList();
-          modifierDd.choices = _modifiers;
+
+          // since PopupField is not supported in UXML we have to create it and add it.
+          // to make it clear where it is added, we keep a VisualElement that will be replaced by it.
+          var replacement = row.Q<VisualElement>("modifiers-dd");
+
+          var modifierDd = new PopupField<string>("modifier:", _modifiers, 0);
+          replacement.parent.Add(modifierDd);
+          modifierDd.PlaceInFront(replacement);
+
+          modifierDd.tooltip = replacement.tooltip;
+          modifierDd.style.marginLeft = modifierDd.style.marginRight = 0;
+
           modifierDd.SetValueWithoutNotify(binding.Representation);
+
+          replacement.RemoveFromHierarchy();
 
           modifierDd.RegisterValueChangedCallback(e =>
           {
@@ -589,8 +646,20 @@ namespace Neovim.Editor
 
         // template dropdown
         string currentTemplateName = GetJumpToCursorPosTemplateName(binding.Args);
-        var templateDd = row.Q<DropdownField>("templates-dd");
-        templateDd.choices = s_OpenFileTemplateNames;
+
+        // since PopupField is not supported in UXML we have to create it and add it.
+        // to make it clear where it is added, we keep a VisualElement that will be replaced by it.
+        var oldTemplatesPlaceholder = row.Q<VisualElement>("templates-dd");
+
+        var templateDd = new PopupField<string>("", s_OpenFileTemplateNames, 0);
+        oldTemplatesPlaceholder.parent.Add(templateDd);
+        templateDd.PlaceInFront(oldTemplatesPlaceholder);
+
+        templateDd.tooltip = oldTemplatesPlaceholder.tooltip;
+        templateDd.style.marginLeft = templateDd.style.marginRight = 0;
+
+        oldTemplatesPlaceholder.RemoveFromHierarchy();
+
         templateDd.SetValueWithoutNotify(currentTemplateName);
 
         // args text field

@@ -1,36 +1,41 @@
-#pragma warning disable IDE0130
+#pragma warning disable IDE0130, IDE0090, IDE0066
 using System;
 using System.IO;
 using System.Collections.Generic;
 using UnityEditor;
-// using Debug = UnityEngine.Debug;
-using Newtonsoft.Json;
+using SimpleJSON;
 
 namespace Neovim.Editor
 {
-  [Serializable]
+
+  public enum RoslynDiagnosticScope
+  {
+    none,
+    openFiles,
+    fullSolution,
+  }
+
   public class ModifierBinding
   {
     /// <summary>
     /// EventModifiers cast to int (0 = no modifier = default).
     /// </summary>
-    public int Modifiers;
+    public int Modifiers = 0;
 
 
     /// <summary>
     /// String representation of this binding (e.g., "SHIFT+CTRL"). This is mainly used so that it is easier to read
     /// this from a raw JSON file.
     /// </summary>
-    public string Representation;
+    public string Representation = string.Empty;
 
 
     /// <summary>
     /// Arguments associated with this binding that will be supplied to nvim remote command.
     /// </summary>
-    public string Args;
+    public string Args = string.Empty;
   }
 
-  [Serializable]
   public class NeovimEditorConfig
   {
     // keep this defaulted to true
@@ -59,7 +64,7 @@ namespace Neovim.Editor
       }
     }
 
-    private string m_NvimExecutablePath;
+    private string m_NvimExecutablePath = string.Empty;
 
     /// <summary>
     /// Absolute path to the Neovim executable currently in use.
@@ -89,7 +94,7 @@ namespace Neovim.Editor
       }
     }
 
-    private string m_TermLaunchCmd;
+    private string m_TermLaunchCmd = string.Empty;
     public string TermLaunchCmd
     {
       get => m_TermLaunchCmd;
@@ -102,7 +107,7 @@ namespace Neovim.Editor
       }
     }
 
-    private string m_TermLaunchArgs;
+    private string m_TermLaunchArgs = string.Empty;
     public string TermLaunchArgs
     {
       get => m_TermLaunchArgs;
@@ -115,7 +120,7 @@ namespace Neovim.Editor
       }
     }
 
-    private string m_TermLaunchEnv;
+    private string m_TermLaunchEnv = string.Empty;
     public string TermLaunchEnv
     {
       get => m_TermLaunchEnv;
@@ -128,7 +133,7 @@ namespace Neovim.Editor
       }
     }
 
-    private string m_OpenFileArgs;
+    private string m_OpenFileArgs = string.Empty;
     /// <summary>
     /// Current open-file arguments that will be supplied to nvim remote cmd upon opening a file from Unity.
     /// </summary>
@@ -144,7 +149,7 @@ namespace Neovim.Editor
       }
     }
 
-    private List<ModifierBinding> m_ModifierBindings = new();
+    private List<ModifierBinding> m_ModifierBindings = new List<ModifierBinding>();
     public List<ModifierBinding> ModifierBindings
     {
       get => m_ModifierBindings;
@@ -155,7 +160,7 @@ namespace Neovim.Editor
       }
     }
 
-    private string m_JumpToCursorPositionArgs;
+    private string m_JumpToCursorPositionArgs = string.Empty;
     public string JumpToCursorPositionArgs
     {
       get => m_JumpToCursorPositionArgs;
@@ -168,7 +173,7 @@ namespace Neovim.Editor
       }
     }
 
-    private string m_PrevServerSocket;
+    private string m_PrevServerSocket = string.Empty;
     public string PrevServerSocket
     {
       get => m_PrevServerSocket;
@@ -182,7 +187,7 @@ namespace Neovim.Editor
     }
 
 #if UNITY_EDITOR_WIN
-    private string m_PrevServerProcessIntPtrStringRepr;
+    private string m_PrevServerProcessIntPtrStringRepr = string.Empty;
     public string PrevServerProcessIntPtrStringRepr
     {
       get => m_PrevServerProcessIntPtrStringRepr;
@@ -196,7 +201,7 @@ namespace Neovim.Editor
     }
 #endif
 
-    private List<string> m_Analyzers = new();
+    private List<string> m_Analyzers = new List<string>();
     public List<string> Analyzers
     {
       get => m_Analyzers;
@@ -207,13 +212,85 @@ namespace Neovim.Editor
       }
     }
 
+    private RoslynDiagnosticScope m_analyzerDiagnosticScope = RoslynDiagnosticScope.openFiles;
+    public RoslynDiagnosticScope AnalyzerDiagnosticScope
+    {
+      get => m_analyzerDiagnosticScope;
+      set
+      {
+        if (value == m_analyzerDiagnosticScope)
+          return;
+        m_analyzerDiagnosticScope = value;
+        m_Dirty = true;
+      }
+    }
+
+
+    private RoslynDiagnosticScope m_compilerDiagnosticScope = RoslynDiagnosticScope.openFiles;
+    public RoslynDiagnosticScope CompilerDiagnosticScope
+    {
+      get => m_compilerDiagnosticScope;
+      set
+      {
+        if (value == m_compilerDiagnosticScope)
+          return;
+        m_compilerDiagnosticScope = value;
+        m_Dirty = true;
+      }
+    }
+
+
     public bool SetDirty(bool dirty) => m_Dirty = dirty;
+
 
     public void Save()
     {
+
       if (!m_Dirty)
         return;
-      string json = JsonConvert.SerializeObject(this /* Formatting.Indented */);
+
+      string json;
+      // create a JSONObject node and populate it
+      {
+        var node = new JSONObject();
+        node.Add("AnalyzerDiagnosticScope", new JSONString(m_analyzerDiagnosticScope.ToString()));
+        node.Add("CompilerDiagnosticScope", new JSONString(m_compilerDiagnosticScope.ToString()));
+        node.Add("CsprojFlags", new JSONNumber((int)m_CsprojFlags));
+        node.Add("NvimExecutablePath", new JSONString(m_NvimExecutablePath));
+        node.Add("TermLaunchCmd", new JSONString(m_TermLaunchCmd));
+        node.Add("TermLaunchArgs", new JSONString(m_TermLaunchArgs));
+        node.Add("TermLaunchEnv", new JSONString(m_TermLaunchEnv));
+        node.Add("OpenFileArgs", new JSONString(m_OpenFileArgs));
+        node.Add("JumpToCursorPositionArgs", new JSONString(m_JumpToCursorPositionArgs));
+        node.Add("ProcessTimeout", new JSONNumber(m_ProcessTimeout));
+        node.Add("PrevServerSocket", new JSONString(m_PrevServerSocket));
+#if UNITY_EDITOR_WIN
+        node.Add("PrevServerProcessIntPtrStringRepr", new JSONString(m_PrevServerProcessIntPtrStringRepr));
+#endif
+        // analyzers
+        {
+          var nodeArray = new JSONArray();
+          for (int i = 0; i < m_Analyzers.Count; ++i)
+            nodeArray.Add(null, new JSONString(m_Analyzers[i]));
+          node.Add("Analyzers", nodeArray);
+        }
+
+        // modifier bindings
+        {
+          var nodeArray = new JSONArray();
+          for (int i = 0; i < m_ModifierBindings.Count; ++i)
+          {
+            var nodeObj = new JSONObject();
+            nodeObj.Add("Modifiers", new JSONNumber(m_ModifierBindings[i].Modifiers));
+            nodeObj.Add("Representation", new JSONString(m_ModifierBindings[i].Representation));
+            nodeObj.Add("Args", new JSONString(m_ModifierBindings[i].Args));
+            nodeArray.Add(null, nodeObj);
+          }
+          node.Add("ModifierBindings", nodeArray);
+        }
+
+        json = node.ToString();
+      }
       EditorPrefs.SetString("NvimUnityConfigJson", json);
     }
 
@@ -231,15 +308,55 @@ namespace Neovim.Editor
       // dirty flag is already set to true by default
       if (string.IsNullOrWhiteSpace(json))
       {
-        var config = new NeovimEditorConfig();
-        config.SetDirty(true);  // just to be 100% sure
-        return config;
+        var _config = new NeovimEditorConfig();
+        _config.SetDirty(true);  // just to be 100% sure
+        return _config;
       }
 
-      var neovimConfig = JsonConvert.DeserializeObject<NeovimEditorConfig>(json);
+      var config = new NeovimEditorConfig();
+      {
+        var d = JSONNode.Parse(json) as JSONObject;
+
+        Enum.TryParse<RoslynDiagnosticScope>((d["AnalyzerDiagnosticScope"] as JSONString).Value, out var analyzerDiagnosticScope);
+        config.AnalyzerDiagnosticScope = analyzerDiagnosticScope;
+
+        Enum.TryParse<RoslynDiagnosticScope>((d["CompilerDiagnosticScope"] as JSONString).Value, out var compilerDiagnosticScope);
+        config.CompilerDiagnosticScope = compilerDiagnosticScope;
+
+        config.CsprojFlags = (ProjectGenerationFlag)(d["CsprojFlags"] as JSONNumber).AsULong;
+        config.NvimExecutablePath = (d["NvimExecutablePath"] as JSONString).Value;
+        config.TermLaunchCmd = (d["TermLaunchCmd"] as JSONString).Value;
+        config.TermLaunchArgs = (d["TermLaunchArgs"] as JSONString).Value;
+        config.TermLaunchEnv = (d["TermLaunchEnv"] as JSONString).Value;
+        config.OpenFileArgs = (d["OpenFileArgs"] as JSONString).Value;
+        config.JumpToCursorPositionArgs = (d["JumpToCursorPositionArgs"] as JSONString).Value;
+        config.ProcessTimeout = (int)(d["ProcessTimeout"] as JSONNumber).AsULong;
+        config.PrevServerSocket = (d["PrevServerSocket"] as JSONString).Value;
+#if UNITY_EDITOR_WIN
+        config.PrevServerProcessIntPtrStringRepr = (d["PrevServerProcessIntPtrStringRepr"] as JSONString).Value;
+#endif
+
+        for (int i = 0; i < d["Analyzers"].Count; ++i)
+        {
+          config.Analyzers.Add(d["Analyzers"][i].Value);
+        }
+
+        for (int i = 0; i < d["ModifierBindings"].Count; ++i)
+        {
+          var mb = new ModifierBinding
+          {
+            Modifiers = (int)d["ModifierBindings"][i]["Modifiers"].AsULong,
+            Representation = d["ModifierBindings"][i]["Representation"].Value,
+            Args = d["ModifierBindings"][i]["Args"].Value
+          };
+          config.ModifierBindings.Add(mb);
+        }
+      }
+
       // since we have just deserialized this - it should not have an internal dirty state
-      neovimConfig.SetDirty(false);
-      return neovimConfig;
+      config.SetDirty(false);
+      return config;
+
     }
 
     public bool TryAddAnalyzer(string path)
