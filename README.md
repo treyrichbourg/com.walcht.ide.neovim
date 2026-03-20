@@ -4,18 +4,18 @@ Neovim integration with the Unity game engine. Inspired from the official Visual
 Studio editor IDE package: [com.unity.ide.visualstudio][com.unity.ide.visualstudio].
 
 > [!Important]
-> This package only supports **Unity >= 2019.4 LTS**. Support for older versions
-> is not and will not be planned.
+> This package only supports **Unity >= 2019.4 LTS**.
 
 This package is constantly tested against the following Unity versions and
 platforms:
 
 | Unity                     | OS                    | Status (\*Notes)         |
 | ------------------------- | --------------------- |------------------------- |
+| Unity 6000.4 LTS          | Ubuntu 24.04          | OK                       |
 | Unity 6000.3 LTS          | Windows 10            | OK                       |
 | Unity 2022.3 LTS          | Windows 10            | OK                       |
-| Unity 2022.3 LTS          | Ubuntu                | OK                       |
-| Unity 2020.3 LTS          | Windows 10            | OK (\*issue with the settings menu - issue with Unity's UIToolkit)   |
+| Unity 2022.3 LTS          | Ubuntu 20.04          | OK                       |
+| Unity 2020.3 LTS          | Windows 10            | OK (\*might get issues with the settings menu - bug with Unity's UIToolkit)   |
 | Unity 2019.4 LTS          | Windows 10            | OK                       |
 
 ## Features
@@ -26,7 +26,7 @@ platforms:
 - Jumping to cursor position on the requested file in the currently running Neovim
   server instance
 - Auto focusing on Neovim server instance window (on Linux, currently only on GNOME
-  and full support on Windows with Windows Terminal)
+  and full support on Windows)
 - Fully customizable commands (terminal launch command, open-file arguments, and
   jump-to-cursor position arguments)
 - Option to add custom analyzers to generated `.csproj` files (usefull for
@@ -35,6 +35,12 @@ platforms:
   instance is running and then you open the same project again, the same instance
   is used - persistency is achieved through:
   ```EditorPrefs.SetString("NvimUnityConfigJson", configJson)```)
+- Settings for Roslyn Language Server through the top menu `Neovim -> Settings`
+- Correct project root directory discovery and setup even when opening a C# from an
+  external package
+- Zero external dependencies (no Neowtonsoft package dependency and JSON is handled
+  using integrated SimpleJSON)
+- .NET Standard 2.0 and C# 7.3 compatibility
 
 ## Installation
 
