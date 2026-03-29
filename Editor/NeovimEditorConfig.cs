@@ -313,49 +313,60 @@ namespace Neovim.Editor
         return _config;
       }
 
-      var config = new NeovimEditorConfig();
-      {
-        var d = JSONNode.Parse(json) as JSONObject;
+      try
+        {
+            var config = new NeovimEditorConfig();
+            {
+              var d = JSONNode.Parse(json) as JSONObject;
 
-        Enum.TryParse<RoslynDiagnosticScope>((d["AnalyzerDiagnosticScope"] as JSONString).Value, out var analyzerDiagnosticScope);
-        config.AnalyzerDiagnosticScope = analyzerDiagnosticScope;
+              Enum.TryParse<RoslynDiagnosticScope>((d["AnalyzerDiagnosticScope"] as JSONString).Value, out var analyzerDiagnosticScope);
+              config.AnalyzerDiagnosticScope = analyzerDiagnosticScope;
 
-        Enum.TryParse<RoslynDiagnosticScope>((d["CompilerDiagnosticScope"] as JSONString).Value, out var compilerDiagnosticScope);
-        config.CompilerDiagnosticScope = compilerDiagnosticScope;
+              Enum.TryParse<RoslynDiagnosticScope>((d["CompilerDiagnosticScope"] as JSONString).Value, out var compilerDiagnosticScope);
+              config.CompilerDiagnosticScope = compilerDiagnosticScope;
 
-        config.CsprojFlags = (ProjectGenerationFlag)(d["CsprojFlags"] as JSONNumber).AsULong;
-        config.NvimExecutablePath = (d["NvimExecutablePath"] as JSONString).Value;
-        config.TermLaunchCmd = (d["TermLaunchCmd"] as JSONString).Value;
-        config.TermLaunchArgs = (d["TermLaunchArgs"] as JSONString).Value;
-        config.TermLaunchEnv = (d["TermLaunchEnv"] as JSONString).Value;
-        config.OpenFileArgs = (d["OpenFileArgs"] as JSONString).Value;
-        config.JumpToCursorPositionArgs = (d["JumpToCursorPositionArgs"] as JSONString).Value;
-        config.ProcessTimeout = (int)(d["ProcessTimeout"] as JSONNumber).AsULong;
-        config.PrevServerSocket = (d["PrevServerSocket"] as JSONString).Value;
+              config.CsprojFlags = (ProjectGenerationFlag)(d["CsprojFlags"] as JSONNumber).AsULong;
+              config.NvimExecutablePath = (d["NvimExecutablePath"] as JSONString).Value;
+              config.TermLaunchCmd = (d["TermLaunchCmd"] as JSONString).Value;
+              config.TermLaunchArgs = (d["TermLaunchArgs"] as JSONString).Value;
+              config.TermLaunchEnv = (d["TermLaunchEnv"] as JSONString).Value;
+              config.OpenFileArgs = (d["OpenFileArgs"] as JSONString).Value;
+              config.JumpToCursorPositionArgs = (d["JumpToCursorPositionArgs"] as JSONString).Value;
+              config.ProcessTimeout = (int)(d["ProcessTimeout"] as JSONNumber).AsULong;
+              config.PrevServerSocket = (d["PrevServerSocket"] as JSONString).Value;
 #if UNITY_EDITOR_WIN
-        config.PrevServerProcessIntPtrStringRepr = (d["PrevServerProcessIntPtrStringRepr"] as JSONString).Value;
+              config.PrevServerProcessIntPtrStringRepr = (d["PrevServerProcessIntPtrStringRepr"] as JSONString).Value;
 #endif
 
-        for (int i = 0; i < d["Analyzers"].Count; ++i)
-        {
-          config.Analyzers.Add(d["Analyzers"][i].Value);
-        }
+              for (int i = 0; i < d["Analyzers"].Count; ++i)
+              {
+                config.Analyzers.Add(d["Analyzers"][i].Value);
+              }
 
-        for (int i = 0; i < d["ModifierBindings"].Count; ++i)
-        {
-          var mb = new ModifierBinding
-          {
-            Modifiers = (int)d["ModifierBindings"][i]["Modifiers"].AsULong,
-            Representation = d["ModifierBindings"][i]["Representation"].Value,
-            Args = d["ModifierBindings"][i]["Args"].Value
-          };
-          config.ModifierBindings.Add(mb);
-        }
-      }
+              for (int i = 0; i < d["ModifierBindings"].Count; ++i)
+              {
+                var mb = new ModifierBinding
+                {
+                  Modifiers = (int)d["ModifierBindings"][i]["Modifiers"].AsULong,
+                  Representation = d["ModifierBindings"][i]["Representation"].Value,
+                  Args = d["ModifierBindings"][i]["Args"].Value
+                };
+                config.ModifierBindings.Add(mb);
+              }
+            }
 
-      // since we have just deserialized this - it should not have an internal dirty state
-      config.SetDirty(false);
-      return config;
+            // since we have just deserialized this - it should not have an internal dirty state
+            config.SetDirty(false);
+            return config;
+        }
+      catch (Exception e)
+      {
+                  UnityEngine.Debug.LogWarning($"[neovim.ide] failed to parse config, resetting to defaults. Reason: {e.Message}");
+        var _config = new NeovimEditorConfig();
+        _config.SetDirty(true);
+        _config.Save(); // write fresh defaults immediately
+        return _config;
+    }
 
     }
 
