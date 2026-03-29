@@ -139,6 +139,7 @@ namespace Neovim.Editor
       ("ptyxis", "--title \"nvimunity-{instanceId}\" -- {app} {filePath} --listen {serverSocket} " + s_NvimCmdString),
       ("xterm", "-T \"nvimunity-{instanceId}\" -e {app} {filePath} --listen {serverSocket} " + s_NvimCmdString),
       ("ghostty", "--title=\"nvimunity-{instanceId}\" --command='{app} {filePath} --listen {serverSocket} " + s_NvimCmdString),
+      ("kitty", "--title \"nvimunity-{instanceId}\" -- {app} {filePath} --listen {serverSocket} " + s_NvimCmdString ),
     };
 #elif UNITY_EDITOR_OSX
     {
@@ -649,7 +650,7 @@ namespace Neovim.Editor
       {
         try
         {
-          // Note: on .Net Standard 2.0 (at least on Unity 2019.4) there is a race-condition bug within the 
+          // Note: on .Net Standard 2.0 (at least on Unity 2019.4) there is a race-condition bug within the
           // NamedPipeClientStream.Connect() instance method. This is the reason why we invoke a Powershell script and
           // just avoid that mess. Read this for details:
           //  https://github.com/dotnet/runtime/pull/65553
@@ -687,7 +688,7 @@ namespace Neovim.Editor
 
 
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <param name="app"></param>
     /// <param name="filePath"></param>
