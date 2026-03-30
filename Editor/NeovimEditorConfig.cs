@@ -316,6 +316,7 @@ namespace Neovim.Editor
       try
         {
             var config = new NeovimEditorConfig();
+            UnityEngine.Debug.Log($"[neovim.ide] parsing config JSON: {json}");
             {
               var d = JSONNode.Parse(json) as JSONObject;
 
