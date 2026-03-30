@@ -460,18 +460,24 @@ namespace Neovim.Editor
       m_AppPlaceholderTf.SetValueWithoutNotify(NeovimCodeEditor.s_Config.NvimExecutablePath);
 
       // update terminal launch cmd shit
-      if (!NeovimCodeEditor.TryChangeTermLaunchCmd(m_TermLaunchCmdTf.value, m_TermLaunchArgsTf.value, m_TermLaunchEnvTf.value))
+      if (!NeovimCodeEditor.TryChangeTermLaunchCmd(
+                  m_TermLaunchCmdTf.value,
+                  m_TermLaunchArgsTf.value.Replace("\n", "\\n").Replace("\r", "\\r"),
+                  m_TermLaunchEnvTf.value))
       {
         // TODO: show popup and change border to red
       }
 
       // update open-file request modifier bindings args
       NeovimCodeEditor.s_Config.ModifierBindings = m_ModifierBindings
-        .Select(b => new ModifierBinding { Modifiers = b.Modifiers, Args = b.Args, Representation = b.Representation })
+        .Select(b => new ModifierBinding {
+                Modifiers = b.Modifiers,
+                Args = b.Args.Replace("\n", "\\n").Replace("\r", "\\r"),
+                Representation = b.Representation })
         .ToList();
 
       // update jumo-to-cursor-position args
-      m_JumpToCursorPosArgsTf.SetValueWithoutNotify(NeovimCodeEditor.s_Config.JumpToCursorPositionArgs = m_JumpToCursorPosArgsTf.value);
+      m_JumpToCursorPosArgsTf.SetValueWithoutNotify(NeovimCodeEditor.s_Config.JumpToCursorPositionArgs = m_JumpToCursorPosArgsTf.value.Replace("\n", "\\n").Replace("\r", "\\r"));
 
       // update process timeout
       m_ProcessTimeoutIf.SetValueWithoutNotify(NeovimCodeEditor.s_Config.ProcessTimeout = m_ProcessTimeoutIf.value);
